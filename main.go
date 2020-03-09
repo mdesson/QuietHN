@@ -1,10 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
 
-func main() {
-	fmt.Println("vim-go")
-}
+const apiBase = "https://hacker-news.firebaseio.com/v0/"
 
 var template = `
 <!DOCTYPE html>
@@ -21,3 +25,36 @@ var template = `
 </body>
 </html>
 `
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, template)
+}
+
+// Returns an array integers, representing a story
+func fetchTopStories() []int {
+	url := apiBase + "topstories.json"
+	var output []int
+
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = json.Unmarshal(body, &output); err != nil {
+		log.Fatal(err)
+	}
+	return output
+}
+
+// TODO: Given id, fetch story
+
+func main() {
+	http.HandleFunc("/", handler)
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+	fmt.Println("Started server on port 8000")
+}
