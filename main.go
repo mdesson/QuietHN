@@ -3,17 +3,19 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 )
 
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
 
-// TODO: Create nonstatic template
-var template = `
+// TODO: Style page
+var HNtemplate = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -23,23 +25,28 @@ var template = `
 <body>
 	<h1>Quiet Hacker News</h1>
 <ol>
-	<li><a href="https://www.google.ca">Literally just google.com</a> <span class="source">google.ca</span></li>
-	<li><a href="https://www.yahoo.ca">Yahoo?</a> <span class="source">yahoo.ca</span></li>
+	{{range .}}
+	<li><a href="{{.URL}}">{{.Title}}</a> <span class="source">{{.Domain}}</span>
+	{{end}}
+</ol>
 </body>
 </html>
 `
 
 // Contains a hackernews story
 type story struct {
-	ID    int    `json:"id"`
-	Title string `json:"title"`
-	Type  string `json:"type"`
-	URL   string `json:"url"`
+	ID     int    `json:"id"`
+	Title  string `json:"title"`
+	Type   string `json:"type"`
+	URL    string `json:"url"`
+	Domain string
 }
 
 // Handler function, renders our only template
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, template)
+	stories := fetchTopThirty()
+	parsedTemplate := template.Must(template.New("QuietHN").Parse(HNtemplate))
+	parsedTemplate.Execute(w, stories)
 }
 
 // Returns an array integers, representing a story
@@ -68,10 +75,10 @@ func fetchTopStories() []int {
 // Given id, fetch story
 func fetchStory(id int) story {
 	idString := strconv.Itoa(id)
-	url := apiBase + "item/" + idString + ".json"
+	storyUrl := apiBase + "item/" + idString + ".json"
 	var output story
 
-	res, err := http.Get(url)
+	res, err := http.Get(storyUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,6 +91,18 @@ func fetchStory(id int) story {
 
 	if err = json.Unmarshal(body, &output); err != nil {
 		log.Fatal(err)
+	}
+
+	u, err := url.Parse(output.URL)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// TODO: Remove check on URL length once all selfposts are removed
+	if len(u.Host) > 4 && u.Host[:4] == "www." {
+		output.Domain = u.Host[4:]
+	} else {
+		output.Domain = u.Host
 	}
 
 	return output
@@ -100,7 +119,6 @@ func fetchTopThirty() []story {
 		i := i
 		go func() {
 			defer wg.Done()
-			fmt.Println(i)
 			output[i] = fetchStory(id)
 		}()
 	}
@@ -110,8 +128,6 @@ func fetchTopThirty() []story {
 
 func main() {
 	http.HandleFunc("/", handler)
-	// log.Fatal(http.ListenAndServe("localhost:8000", nil))
-	// fmt.Println("Started server on port 8000")
-	stories := fetchTopThirty()
-	fmt.Println(stories)
+	fmt.Println("Starting server on port 8000")
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
 }
