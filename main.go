@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 )
 
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
@@ -64,8 +65,8 @@ func fetchTopStories() []int {
 	return output
 }
 
-// TODO: Given id, fetch story
-func fetchStory(id int) {
+// Given id, fetch story
+func fetchStory(id int) story {
 	idString := strconv.Itoa(id)
 	url := apiBase + "item/" + idString + ".json"
 	var output story
@@ -85,13 +86,32 @@ func fetchStory(id int) {
 		log.Fatal(err)
 	}
 
-	fmt.Println(output.Title)
+	return output
+}
+
+// TODO: Fetch only links
+func fetchTopThirty() []story {
+	output := make([]story, 30)
+	var wg sync.WaitGroup
+	ids := fetchTopStories()
+	for i, id := range ids[:30] {
+		wg.Add(1)
+		id := id
+		i := i
+		go func() {
+			defer wg.Done()
+			fmt.Println(i)
+			output[i] = fetchStory(id)
+		}()
+	}
+	wg.Wait()
+	return output
 }
 
 func main() {
 	http.HandleFunc("/", handler)
 	// log.Fatal(http.ListenAndServe("localhost:8000", nil))
 	// fmt.Println("Started server on port 8000")
-	id := fetchTopStories()[0]
-	fetchStory(id)
+	stories := fetchTopThirty()
+	fmt.Println(stories)
 }
