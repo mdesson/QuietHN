@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
 
+// TODO: Create nonstatic template
 var template = `
 <!DOCTYPE html>
 <html>
@@ -26,6 +28,15 @@ var template = `
 </html>
 `
 
+// Contains a hackernews story
+type story struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+	URL   string `json:"url"`
+}
+
+// Handler function, renders our only template
 func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, template)
 }
@@ -45,16 +56,42 @@ func fetchTopStories() []int {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if err = json.Unmarshal(body, &output); err != nil {
 		log.Fatal(err)
 	}
+
 	return output
 }
 
 // TODO: Given id, fetch story
+func fetchStory(id int) {
+	idString := strconv.Itoa(id)
+	url := apiBase + "item/" + idString + ".json"
+	var output story
+
+	res, err := http.Get(url)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = json.Unmarshal(body, &output); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(output.Title)
+}
 
 func main() {
 	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe("localhost:8000", nil))
-	fmt.Println("Started server on port 8000")
+	// log.Fatal(http.ListenAndServe("localhost:8000", nil))
+	// fmt.Println("Started server on port 8000")
+	id := fetchTopStories()[0]
+	fetchStory(id)
 }
