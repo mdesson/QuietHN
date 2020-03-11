@@ -22,12 +22,26 @@ var HNtemplate = `
 <head>
 	<meta charset="utf-8">
 	<title>Quiet Hacker News</title>
+	<style>
+		body {
+			font-family: Helvetica, Arial, sans-serif;
+		}
+		li {
+			margin: 0.5em
+		}
+		a {
+			color: black;
+		}
+		.source {
+			color: grey;
+		}
+	</style>
 </head>
 <body>
 	<h1>Quiet Hacker News</h1>
 <ol>
 	{{range .}}
-	<li><a href="{{.URL}}">{{.Title}}</a> <span class="source">{{.Domain}}</span>
+	<li><a href="{{.URL}}">{{.Title}}</a> <span class="source">({{.Domain}})</span>
 	{{end}}
 </ol>
 </body>
