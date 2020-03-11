@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// TODO: Keep cache state in main()
+// TODO: Set cache to update on ticker
+
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
 
 var templateHN = `
