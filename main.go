@@ -156,6 +156,7 @@ func fetchTopThirty() []Story {
 					inputIndex++
 				}
 				outputIndex++
+				fmt.Println(inputIndex)
 			}
 			inputIndex = i * 40
 		}
