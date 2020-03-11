@@ -59,13 +59,6 @@ type Story struct {
 	Domain string
 }
 
-// Handler function, renders our only template
-func handler(w http.ResponseWriter, r *http.Request) {
-	stories := fetchTopThirty()
-	parsedTemplate := template.Must(template.New("QuietHN").Parse(templateHN))
-	parsedTemplate.Execute(w, stories)
-}
-
 // Returns an array integers, representing a story
 func fetchTopStories() []int {
 	url := apiBase + "topstories.json"
@@ -200,7 +193,28 @@ func fetchTopThirty() []Story {
 }
 
 func main() {
-	http.HandleFunc("/", handler)
+	// Get initial cache
+	stories := fetchTopThirty()
+
+	// Refresh cache every hour
+	ticker := time.NewTicker(1 * time.Hour)
+	done := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				fmt.Print("Cache refresh. ")
+				stories = fetchTopThirty()
+			}
+		}
+	}()
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		parsedTemplate := template.Must(template.New("QuietHN").Parse(templateHN))
+		parsedTemplate.Execute(w, stories)
+	})
 	fmt.Println("Starting server on port 8000")
 	log.Fatal(http.ListenAndServe("localhost:8000", nil))
 }
