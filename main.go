@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 )
 
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
@@ -33,8 +34,8 @@ var HNtemplate = `
 </html>
 `
 
-// Contains a hackernews story
-type story struct {
+// Story Contains a hackernews story
+type Story struct {
 	ID     int    `json:"id"`
 	Title  string `json:"title"`
 	Type   string `json:"type"`
@@ -73,12 +74,12 @@ func fetchTopStories() []int {
 }
 
 // Given id, fetch story
-func fetchStory(id int) story {
+func fetchStory(id int) Story {
 	idString := strconv.Itoa(id)
-	storyUrl := apiBase + "item/" + idString + ".json"
-	var output story
+	storyURL := apiBase + "item/" + idString + ".json"
+	var output Story
 
-	res, err := http.Get(storyUrl)
+	res, err := http.Get(storyURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,7 +99,6 @@ func fetchStory(id int) story {
 		fmt.Println(err)
 	}
 
-	// TODO: Remove check on URL length once all selfposts are removed
 	if len(u.Host) > 4 && u.Host[:4] == "www." {
 		output.Domain = u.Host[4:]
 	} else {
@@ -108,21 +108,77 @@ func fetchStory(id int) story {
 	return output
 }
 
-// TODO: Fetch only links
-func fetchTopThirty() []story {
-	output := make([]story, 30)
-	var wg sync.WaitGroup
-	ids := fetchTopStories()
-	for i, id := range ids[:30] {
-		wg.Add(1)
-		id := id
-		i := i
+// TODO: Debug
+func fetchTopThirty() []Story {
+	fmt.Print("Feching stories... ")
+	start := time.Now()
+
+	output := make([]Story, 30)
+	ids := fetchTopStories()[:120]
+	stories := make([]Story, 120)
+	outputFull := make(chan bool)
+	doneFetching := make(chan bool)
+	readyToParse := make(chan bool)
+
+	// Parse goroutine: Parses through stories, filling output
+	go func() {
+		inputIndex := 0
+		outputIndex := 0
+
+		// Loop over each batch of 40
+		for i := 0; i < 3; i++ {
+			// Block until batch is ready
+			<-readyToParse
+			// Fill as much of output as possible during batch
+			for outputIndex < 30 {
+				for _, story := range stories[inputIndex : inputIndex+40] {
+					if story.URL != "" && story.Type == "story" {
+						output[outputIndex] = story
+						inputIndex++
+						break
+					}
+					inputIndex++
+				}
+				outputIndex++
+			}
+			inputIndex = i * 40
+		}
+
+		// Signal we have found all 30
+		outputFull <- true
+	}()
+
+	// Fetch goroutines: Loop over 40/80/120 top stories
+	for i := 0; i < 3; i++ {
+		index := i * 40
+
 		go func() {
-			defer wg.Done()
-			output[i] = fetchStory(id)
+			var wg sync.WaitGroup
+			wg.Add(40)
+			for i, id := range ids[index : index+40] {
+				i, id := i, id
+				go func() {
+					defer wg.Done()
+					stories[i] = fetchStory(id)
+				}()
+			}
+			wg.Wait()
+			// Signal to loop ready to continue
+			doneFetching <- true
 		}()
+
+		select {
+		// All 30 found, end loop
+		case <-outputFull:
+			break
+		case <-doneFetching:
+			readyToParse <- true
+		}
 	}
-	wg.Wait()
+
+	elapsed := time.Now().Sub(start)
+	fmt.Printf("Complete (%v)\n", elapsed)
+
 	return output
 }
 
