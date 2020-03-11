@@ -15,8 +15,7 @@ import (
 
 const apiBase = "https://hacker-news.firebaseio.com/v0/"
 
-// TODO: Style page
-var HNtemplate = `
+var templateHN = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -60,7 +59,7 @@ type Story struct {
 // Handler function, renders our only template
 func handler(w http.ResponseWriter, r *http.Request) {
 	stories := fetchTopThirty()
-	parsedTemplate := template.Must(template.New("QuietHN").Parse(HNtemplate))
+	parsedTemplate := template.Must(template.New("QuietHN").Parse(templateHN))
 	parsedTemplate.Execute(w, stories)
 }
 
