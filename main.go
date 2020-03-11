@@ -124,9 +124,9 @@ func fetchStory(id int) Story {
 	return output
 }
 
-// TODO: Debug
+// Fetches top 30 stories
 func fetchTopThirty() []Story {
-	fmt.Print("Feching stories... ")
+	fmt.Print("Fetching stories... ")
 	start := time.Now()
 
 	output := make([]Story, 30)
@@ -156,19 +156,20 @@ func fetchTopThirty() []Story {
 					inputIndex++
 				}
 				outputIndex++
-				fmt.Println(inputIndex)
 			}
 			inputIndex = i * 40
-		}
 
-		// Signal we have found all 30
-		outputFull <- true
+			// End loop if all 30 slots are filled
+			if outputIndex >= 30 {
+				outputFull <- true
+				return
+			}
+		}
 	}()
 
 	// Fetch goroutines: Loop over 40/80/120 top stories
 	for i := 0; i < 3; i++ {
 		index := i * 40
-
 		go func() {
 			var wg sync.WaitGroup
 			wg.Add(40)
@@ -187,15 +188,14 @@ func fetchTopThirty() []Story {
 		select {
 		// All 30 found, end loop
 		case <-outputFull:
-			break
+			elapsed := time.Now().Sub(start)
+			fmt.Printf("Complete (%v)\n", elapsed)
+			return output
 		case <-doneFetching:
 			readyToParse <- true
 		}
 	}
-
-	elapsed := time.Now().Sub(start)
-	fmt.Printf("Complete (%v)\n", elapsed)
-
+	fmt.Println("outputFull select not triggered")
 	return output
 }
 
